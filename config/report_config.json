@@ -1,19 +1,25 @@
-{
-    "organization": "보령시농업기술센터",
-    "report_month": "2025. 05",
-    "period": "2025-05-01 ~ 2025-05-31",
-    "company_logo": true,
-    "grafana_servers": [
-        {
-            "name": "Production-Server",
-            "url": "175.45.222.66:3000",
-            "token": ""
-        }
-    ],
-    "report_settings": {
-        "include_storage_details": true,
-        "charts_per_page": 4,
-        "exclude_disk_rw_alerts": true,
-        "time_range": "30d"
-    }
+﻿{
+    "report_month":  "2025. 05",
+    "last_download":  {
+                          "total_images":  12,
+                          "timestamp":  "20250528_141924",
+                          "download_time":  "2025-05-28 14:20:02",
+                          "download_path":  "D:\\GrafanaReportGenerator\\images\\20250528_141924",
+                          "success_images":  12
+                      },
+    "report_settings":  {
+                            "grafana_time_from":  "2025-05-01",
+                            "charts_per_page":  4,
+                            "grafana_time_to":  "2025-05-31",
+                            "time_range":  "30d",
+                            "include_storage_details":  true
+                        },
+    "period":  "2025-05-01 ~ 2025-05-31",
+    "grafana_servers":  [
+                            {
+                                "url":  "175.45.222.66:3000",
+                                "name":  "Production-Server",
+                                "token":  ""
+                            }
+                        ]
 }

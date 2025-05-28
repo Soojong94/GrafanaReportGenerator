@@ -1,101 +1,92 @@
 # 01_download_images.ps1
-param(
-    [string]$ConfigPath = "config\report_config.json"
-)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
-# ===== 자동 그라파나 이미지 다운로더 (환경변수 버전) =====
+Write-Host "=== Grafana Image Downloader Start ==="
 
-Add-Type -AssemblyName System.Web
-
-Write-Host "=== 그라파나 이미지 다운로더 시작 ==="
-Write-Host "시간: $(Get-Date)"
-
-# 현재 스크립트 경로 기준으로 프로젝트 폴더 설정
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = $scriptPath
-$configFile = Join-Path $projectRoot $ConfigPath
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$configFile = Join-Path $projectRoot "config\report_config.json"
 $imagesDir = Join-Path $projectRoot "images"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $downloadDir = Join-Path $imagesDir $timestamp
 
-Write-Host "프로젝트 폴더: $projectRoot"
-Write-Host "이미지 저장 경로: $downloadDir"
-Write-Host ""
+Write-Host "Project Root: $projectRoot"
+Write-Host "Download Dir: $downloadDir"
 
-# 환경변수 파일 로드
+# Load environment variables
 $envFile = Join-Path $projectRoot ".env"
 if (Test-Path $envFile) {
     Get-Content $envFile | ForEach-Object {
         if ($_ -match "^([^#][^=]+)=(.*)$") {
             $name = $matches[1].Trim()
-            $value = $matches[2].Trim()
-            # 따옴표 제거
-            $value = $value -replace '^"(.*)"$', '$1'
-            $value = $value -replace "^'(.*)'$", '$1'
+            $value = $matches[2].Trim().Trim('"').Trim("'")
             [Environment]::SetEnvironmentVariable($name, $value, "Process")
         }
     }
-    Write-Host "✓ 환경변수 로드 완료"
+    Write-Host "Environment variables loaded"
 } else {
-    Write-Host "❌ .env 파일을 찾을 수 없습니다."
+    Write-Host "ERROR: .env file not found"
     exit 1
 }
 
-# 설정 파일 읽기
-if (Test-Path $configFile) {
-    try {
-        $config = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
-        $servers = $config.grafana_servers
-        Write-Host "✓ 설정 파일 로드 완료: $($servers.Count)개 서버"
-    } catch {
-        Write-Host "❌ 설정 파일 읽기 실패: $($_.Exception.Message)"
+# Load config file
+if (-not (Test-Path $configFile)) {
+    Write-Host "ERROR: Config file not found: $configFile"
+    Write-Host "Please run update_month.ps1 first"
+    exit 1
+}
+
+try {
+    $config = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
+    $servers = $config.grafana_servers
+    Write-Host "Config loaded: $($servers.Count) servers"
+} catch {
+    Write-Host "ERROR: Failed to read config file: $($_.Exception.Message)"
+    exit 1
+}
+
+# Set tokens
+foreach ($server in $servers) {
+    $server.token = [Environment]::GetEnvironmentVariable("GRAFANA_PRODUCTION_TOKEN")
+    if ([string]::IsNullOrWhiteSpace($server.token)) {
+        Write-Host "ERROR: GRAFANA_PRODUCTION_TOKEN not set"
+        Write-Host "Please set token in .env file"
         exit 1
     }
-} else {
-    Write-Host "❌ 설정 파일을 찾을 수 없습니다: $configFile"
-    exit 1
 }
 
-# 토큰 확인
-$missingTokens = @()
-foreach ($server in $servers) {
-    if ([string]::IsNullOrWhiteSpace($server.token)) {
-        $missingTokens += $server.name
-    }
-}
-
-if ($missingTokens.Count -gt 0) {
-    Write-Host "❌ 다음 서버들의 토큰이 설정되지 않았습니다:"
-    foreach ($serverName in $missingTokens) {
-        Write-Host "  - $serverName"
-    }
-    Write-Host ".env 파일에서 토큰을 설정하세요."
-    exit 1
-}
-
-# 기본 디렉터리 생성
+# Create directories
 New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+Write-Host "Created download directory"
 
-# 함수 정의
-function Get-Dashboards {
+# Helper functions
+function Test-GrafanaConnection {
     param([string]$ServerUrl, [string]$Token)
-    
     $headers = @{"Authorization" = "Bearer $Token"}
-    
+    try {
+        Invoke-RestMethod -Uri "http://$ServerUrl/api/org" -Headers $headers -TimeoutSec 10 | Out-Null
+        return $true
+    } catch {
+        Write-Host "  Connection failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Get-GrafanaDashboards {
+    param([string]$ServerUrl, [string]$Token)
+    $headers = @{"Authorization" = "Bearer $Token"}
     try {
         $response = Invoke-RestMethod -Uri "http://$ServerUrl/api/search?type=dash-db" -Headers $headers
         return $response
     } catch {
-        Write-Host "    ✗ 대시보드 목록 조회 실패: $($_.Exception.Message)"
+        Write-Host "  Failed to get dashboards: $($_.Exception.Message)"
         return $null
     }
 }
 
-function Get-DashboardPanels {
+function Get-GrafanaPanels {
     param([string]$ServerUrl, [string]$Token, [string]$DashboardUid)
-    
     $headers = @{"Authorization" = "Bearer $Token"}
-    
     try {
         $response = Invoke-RestMethod -Uri "http://$ServerUrl/api/dashboards/uid/$DashboardUid" -Headers $headers
         $panels = $response.dashboard.panels | Where-Object { 
@@ -103,12 +94,12 @@ function Get-DashboardPanels {
         }
         return $panels
     } catch {
-        Write-Host "    ✗ 패널 정보 조회 실패: $($_.Exception.Message)"
+        Write-Host "  Failed to get panels: $($_.Exception.Message)"
         return $null
     }
 }
 
-function Download-PanelImage {
+function Download-GrafanaPanel {
     param(
         [string]$ServerUrl,
         [string]$Token,
@@ -117,16 +108,19 @@ function Download-PanelImage {
         [string]$OutputPath
     )
     
-    # 설정에서 시간 범위 사용
     $timeFrom = "now-30d"
     $timeTo = "now"
     
+    # Use date range from config if available
     if ($config.report_settings -and $config.report_settings.grafana_time_from) {
-        $fromDate = [DateTime]::Parse($config.report_settings.grafana_time_from)
-        $toDate = [DateTime]::Parse($config.report_settings.grafana_time_to).AddDays(1)
-        
-        $timeFrom = [DateTimeOffset]::new($fromDate).ToUnixTimeMilliseconds()
-        $timeTo = [DateTimeOffset]::new($toDate).ToUnixTimeMilliseconds()
+        try {
+            $fromDate = [DateTime]::Parse($config.report_settings.grafana_time_from)
+            $toDate = [DateTime]::Parse($config.report_settings.grafana_time_to).AddDays(1)
+            $timeFrom = [DateTimeOffset]::new($fromDate).ToUnixTimeMilliseconds()
+            $timeTo = [DateTimeOffset]::new($toDate).ToUnixTimeMilliseconds()
+        } catch {
+            Write-Host "    Date parsing error, using default"
+        }
     }
     
     $url = "http://$ServerUrl/render/d-solo/$DashboardUid" + 
@@ -138,95 +132,80 @@ function Download-PanelImage {
     try {
         Invoke-WebRequest -Uri $url -Headers $headers -OutFile $OutputPath -TimeoutSec 30
         $size = (Get-Item $OutputPath).Length / 1KB
-        Write-Host "      ✓ 패널 $PanelId 완료: $([math]::Round($size, 1)) KB"
+        Write-Host "    Panel $PanelId completed: $([math]::Round($size, 1)) KB"
         return $true
     } catch {
-        Write-Host "      ✗ 패널 $PanelId 실패: $($_.Exception.Message)"
+        Write-Host "    Panel $PanelId failed: $($_.Exception.Message)"
         return $false
     }
 }
 
-function Test-ServerConnection {
-    param([string]$ServerUrl, [string]$Token)
-    
-    $headers = @{"Authorization" = "Bearer $Token"}
-    
-    try {
-        Invoke-RestMethod -Uri "http://$ServerUrl/api/org" -Headers $headers -TimeoutSec 10 | Out-Null
-        return $true
-    } catch {
-        Write-Host "    ✗ 서버 연결 실패: $($_.Exception.Message)"
-        return $false
-    }
-}
-
-function Clean-FileName {
+function Clean-SafeFileName {
     param([string]$Name)
     return $Name -replace '[\\/:*?"<>|]', '_'
 }
 
-# 메인 실행
+# Main execution
 $totalImages = 0
 $successImages = 0
 
 foreach ($server in $servers) {
-    Write-Host "=== [$($server.name)] 서버 처리 중 ==="
+    Write-Host ""
+    Write-Host "=== Processing Server: $($server.name) ==="
     Write-Host "URL: $($server.url)"
     
-    # 서버 연결 테스트
-    Write-Host "  연결 테스트 중..."
-    if (-not (Test-ServerConnection -ServerUrl $server.url -Token $server.token)) {
-        Write-Host "  서버 연결 실패, 다음 서버로 이동..."
-        Write-Host ""
+    # Test connection
+    Write-Host "Testing connection..."
+    if (-not (Test-GrafanaConnection -ServerUrl $server.url -Token $server.token)) {
+        Write-Host "Connection failed, skipping server"
         continue
     }
-    Write-Host "  ✓ 연결 성공"
+    Write-Host "Connection successful"
     
-    # 대시보드 목록 조회
-    Write-Host "  대시보드 목록 조회 중..."
-    $dashboards = Get-Dashboards -ServerUrl $server.url -Token $server.token
+    # Get dashboards
+    Write-Host "Getting dashboards..."
+    $dashboards = Get-GrafanaDashboards -ServerUrl $server.url -Token $server.token
     
     if ($dashboards -eq $null -or $dashboards.Count -eq 0) {
-        Write-Host "  대시보드를 찾을 수 없습니다."
-        Write-Host ""
+        Write-Host "No dashboards found"
         continue
     }
     
-    Write-Host "  발견된 대시보드: $($dashboards.Count)개"
+    Write-Host "Found $($dashboards.Count) dashboards"
     
-    # 서버별 디렉터리 생성
+    # Create server directory
     $serverDir = Join-Path $downloadDir $server.name
     New-Item -ItemType Directory -Path $serverDir -Force | Out-Null
     
-    # 각 대시보드 처리
+    # Process each dashboard
     foreach ($dashboard in $dashboards) {
-        $cleanDashName = Clean-FileName -Name $dashboard.title
+        $cleanDashName = Clean-SafeFileName -Name $dashboard.title
         Write-Host ""
-        Write-Host "  --- [$cleanDashName] 대시보드 처리 중 ---"
+        Write-Host "--- Processing Dashboard: $cleanDashName ---"
         
-        # 패널 정보 조회
-        $panels = Get-DashboardPanels -ServerUrl $server.url -Token $server.token -DashboardUid $dashboard.uid
+        # Get panels
+        $panels = Get-GrafanaPanels -ServerUrl $server.url -Token $server.token -DashboardUid $dashboard.uid
         
         if ($panels -eq $null -or $panels.Count -eq 0) {
-            Write-Host "    패널을 찾을 수 없습니다."
+            Write-Host "  No panels found"
             continue
         }
         
-        Write-Host "    발견된 패널: $($panels.Count)개"
+        Write-Host "  Found $($panels.Count) panels"
         
-        # 대시보드별 디렉터리 생성
+        # Create dashboard directory
         $dashboardDir = Join-Path $serverDir $cleanDashName
         New-Item -ItemType Directory -Path $dashboardDir -Force | Out-Null
         
-        # 각 패널 이미지 다운로드
+        # Download each panel
         foreach ($panel in $panels) {
             $totalImages++
-            $cleanPanelTitle = if ($panel.title) { Clean-FileName -Name $panel.title } else { "Panel" }
+            $cleanPanelTitle = if ($panel.title) { Clean-SafeFileName -Name $panel.title } else { "Panel" }
             $fileName = Join-Path $dashboardDir "$($cleanPanelTitle)_$($panel.id).png"
             
-            Write-Host "    패널: $($panel.title) (ID: $($panel.id))"
+            Write-Host "  Panel: $($panel.title) (ID: $($panel.id))"
             
-            if (Download-PanelImage -ServerUrl $server.url -Token $server.token -DashboardUid $dashboard.uid -PanelId $panel.id -OutputPath $fileName) {
+            if (Download-GrafanaPanel -ServerUrl $server.url -Token $server.token -DashboardUid $dashboard.uid -PanelId $panel.id -OutputPath $fileName) {
                 $successImages++
             }
             
@@ -234,28 +213,41 @@ foreach ($server in $servers) {
         }
     }
     
-    Write-Host ""
-    Write-Host "[$($server.name)] 완료"
+    Write-Host "Server $($server.name) completed"
 }
 
-# 결과 요약
+# Save results - 간단한 방법으로 변경
+try {
+    # 기존 설정 읽어서 새로운 해시테이블 생성
+    $originalConfig = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
+    
+    # 새로운 설정 해시테이블 생성
+    $newConfigHash = @{
+        "report_month" = $originalConfig.report_month
+        "period" = $originalConfig.period
+        "grafana_servers" = $originalConfig.grafana_servers
+        "report_settings" = $originalConfig.report_settings
+        "last_download" = @{
+            "timestamp" = $timestamp
+            "download_path" = $downloadDir
+            "total_images" = $totalImages
+            "success_images" = $successImages
+            "download_time" = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        }
+    }
+    
+    # JSON으로 변환하여 저장
+    $newConfigHash | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
+    Write-Host "Config updated with download info"
+} catch {
+    Write-Host "Warning: Failed to update config file: $($_.Exception.Message)"
+}
+
 Write-Host ""
-Write-Host "=== 다운로드 완료 ==="
-Write-Host "총 이미지: $totalImages개"
-Write-Host "성공: $successImages개"
-Write-Host "실패: $($totalImages - $successImages)개"
-Write-Host "저장 위치: $downloadDir"
-
-# 설정 파일에 마지막 다운로드 정보 저장
-$config | Add-Member -Name "last_download" -Value @{
-    "timestamp" = $timestamp
-    "download_path" = $downloadDir
-    "total_images" = $totalImages
-    "success_images" = $successImages
-    "download_time" = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-} -Force
-
-$config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
-
+Write-Host "=== Download Complete ==="
+Write-Host "Total images: $totalImages"
+Write-Host "Success: $successImages"
+Write-Host "Failed: $($totalImages - $successImages)"
+Write-Host "Location: $downloadDir"
 Write-Host ""
-Write-Host "✅ 이미지 다운로드가 완료되었습니다!"
+Write-Host "Image download completed successfully!"
