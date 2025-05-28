@@ -1,3 +1,4 @@
 reportlab>=3.6.0
 python-dotenv>=1.0.0
 Pillow>=9.0.0
+weasyprint>=60.0

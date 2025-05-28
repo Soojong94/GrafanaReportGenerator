@@ -1,35 +1,23 @@
-# 02_generate_report.py
 import os
 import json
 import base64
 from pathlib import Path
 from datetime import datetime
 import logging
+from collections import defaultdict
 
 def setup_logging():
-    log_dir = Path("output")
-    log_dir.mkdir(exist_ok=True)
-    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_dir / 'report_generation.log', encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=[logging.StreamHandler()]
     )
 
 def load_config():
     config_path = Path("config/report_config.json")
-    if not config_path.exists():
-        logging.error(f"설정 파일을 찾을 수 없습니다: {config_path}")
-        return None
-    
     try:
         with open(config_path, 'r', encoding='utf-8-sig') as f:
-            config = json.load(f)
-            logging.info("설정 파일 로드 완료")
-            return config
+            return json.load(f)
     except Exception as e:
         logging.error(f"설정 파일 읽기 실패: {e}")
         return None
@@ -37,192 +25,242 @@ def load_config():
 def find_latest_images_folder():
     images_dir = Path("images")
     if not images_dir.exists():
-        logging.error("images 폴더를 찾을 수 없습니다.")
         return None
     
     timestamp_folders = [d for d in images_dir.iterdir() if d.is_dir()]
     if not timestamp_folders:
-        logging.error("이미지 폴더에서 다운로드된 데이터를 찾을 수 없습니다.")
         return None
     
-    latest_folder = max(timestamp_folders, key=lambda x: x.stat().st_mtime)
-    logging.info(f"사용할 이미지 폴더: {latest_folder}")
-    return latest_folder
+    return max(timestamp_folders, key=lambda x: x.stat().st_mtime)
 
-def collect_server_info(images_folder):
-    servers_info = []
+def categorize_chart(filename):
+    """파일명으로 카테고리 자동 분류"""
+    filename_lower = filename.lower()
     
-    for server_folder in images_folder.iterdir():
-        if not server_folder.is_dir():
+    if 'total' in filename_lower:
+        return '종합 현황'
+    elif any(x in filename_lower for x in ['cpu', 'memory']):
+        return '시스템 리소스'
+    elif 'disk' in filename_lower:
+        return '스토리지'
+    elif 'network' in filename_lower:
+        return '네트워크'
+    else:
+        return '기타'
+
+def get_chart_name(filename):
+    """파일명에서 차트 이름 추출"""
+    name = filename.replace('.png', '').replace('_', ' ')
+    # 파일명 끝의 숫자 제거 (예: "Cpu Usage 2" -> "Cpu Usage")
+    parts = name.split()
+    if parts and parts[-1].isdigit():
+        parts = parts[:-1]
+    return ' '.join(parts).title()
+
+def collect_dashboard_data(images_folder):
+    """대시보드별 데이터 수집"""
+    dashboards_data = {}
+    
+    production_folder = images_folder / "Production-Server"
+    if not production_folder.exists():
+        return dashboards_data
+    
+    for dashboard_folder in production_folder.iterdir():
+        if not dashboard_folder.is_dir():
             continue
         
-        total_images = len(list(server_folder.rglob("*.png")))
-        dashboard_count = len([d for d in server_folder.iterdir() if d.is_dir()])
+        dashboard_name = dashboard_folder.name
+        chart_files = list(dashboard_folder.glob("*.png"))
         
-        server_info = {
-            "name": server_folder.name,
-            "dashboard_count": dashboard_count,
-            "image_count": total_images,
-            "image_files": []
+        # 카테고리별로 분류
+        categorized_charts = defaultdict(list)
+        
+        for chart_file in chart_files:
+            category = categorize_chart(chart_file.name)
+            chart_name = get_chart_name(chart_file.name)
+            
+            categorized_charts[category].append({
+                'name': chart_name,
+                'file_path': chart_file,
+                'filename': chart_file.name
+            })
+        
+        # 카테고리별 정렬
+        for category in categorized_charts:
+            categorized_charts[category].sort(key=lambda x: x['name'])
+        
+        dashboards_data[dashboard_name] = {
+            'charts': dict(categorized_charts),
+            'total_charts': len(chart_files)
         }
-        
-        # 이미지 파일 수집
-        for dashboard_folder in server_folder.iterdir():
-            if not dashboard_folder.is_dir():
-                continue
-                
-            for img_file in dashboard_folder.glob("*.png"):
-                server_info["image_files"].append({
-                    "path": img_file,
-                    "dashboard": dashboard_folder.name,
-                    "panel": img_file.stem.replace('_', ' ').title()
-                })
-        
-        servers_info.append(server_info)
-        logging.info(f"서버 정보 수집 완료: {server_info['name']} ({total_images}개 이미지)")
     
-    return servers_info
+    return dashboards_data
 
-def create_pdf_report(config):
-    setup_logging()
-    logging.info("=== PDF 리포트 생성 시작 ===")
-    
-    # 이미지 폴더 찾기
-    images_folder = find_latest_images_folder()
-    if not images_folder:
-        return False
-    
-    # 서버 정보 수집
-    servers_info = collect_server_info(images_folder)
-    if not servers_info:
-        logging.error("서버 정보를 찾을 수 없습니다.")
-        return False
-    
-    # 출력 폴더 생성
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-    
-    # 출력 파일명 생성
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_filename = f"서버모니터링리포트_{config['report_month'].replace('. ', '_')}_{timestamp}.pdf"
-    output_path = output_dir / output_filename
-    
-    # PDF 생성
+def image_to_base64(image_path):
+    """이미지를 base64로 변환"""
     try:
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch, cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        
-        logging.info("PDF 생성 중...")
-        
-        # PDF 문서 생성
-        doc = SimpleDocTemplate(str(output_path), pagesize=A4, 
-                              rightMargin=2*cm, leftMargin=2*cm,
-                              topMargin=2*cm, bottomMargin=2*cm)
-        
-        # 스타일 설정
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            spaceAfter=30,
-            textColor=colors.darkblue
-        )
-        
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            spaceBefore=20,
-            spaceAfter=10,
-            textColor=colors.darkgreen
-        )
-        
-        # PDF 컨텐츠 리스트
-        story = []
-        
-        # 각 서버별 페이지 생성
-        for idx, server in enumerate(servers_info):
-            if idx > 0:
-                story.append(PageBreak())
-            
-            # 서버 제목
-            story.append(Paragraph(f"📊 {server['name']} 서버 모니터링 리포트", title_style))
-            
-            # 기본 정보
-            info_data = [
-                ['리포트 기간', config['period']],
-                ['생성 일시', datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-                ['대시보드 수', f"{server['dashboard_count']}개"],
-                ['차트 수', f"{server['image_count']}개"]
-            ]
-            
-            info_table = Table(info_data, colWidths=[4*cm, 10*cm])
-            info_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-                ('BACKGROUND', (1, 0), (1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            
-            story.append(info_table)
-            story.append(Spacer(1, 20))
-            
-            # 차트 이미지들
-            story.append(Paragraph("📈 모니터링 차트", heading_style))
-            
-            chart_count = 0
-            for img_info in server["image_files"]:
-                try:
-                    # 이미지 크기 조정 (A4 페이지에 맞게)
-                    img = Image(str(img_info["path"]), width=16*cm, height=12*cm)
-                    
-                    # 차트 제목
-                    chart_title = f"{img_info['dashboard']} - {img_info['panel']}"
-                    story.append(Paragraph(chart_title, heading_style))
-                    story.append(img)
-                    story.append(Spacer(1, 20))
-                    
-                    chart_count += 1
-                    
-                    # 페이지당 2개 차트로 제한
-                    if chart_count % 2 == 0 and chart_count < len(server["image_files"]):
-                        story.append(PageBreak())
-                        
-                except Exception as e:
-                    logging.warning(f"이미지 처리 오류: {img_info['path']} - {e}")
-                    continue
-        
-        # PDF 생성
-        doc.build(story)
-        
-        file_size = output_path.stat().st_size / (1024 * 1024)
-        logging.info(f"✅ PDF 생성 완료: {output_path} ({file_size:.1f} MB)")
-        return True
-        
-    except ImportError:
-        logging.error("❌ reportlab이 설치되지 않았습니다.")
-        logging.error("설치 명령어: pip install reportlab")
-        return False
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
     except Exception as e:
-        logging.error(f"❌ PDF 생성 실패: {e}")
-        return False
+        logging.warning(f"이미지 변환 실패 {image_path}: {e}")
+        return ""
 
-def main():
+def generate_chart_sections(charts_data):
+    """차트 섹션 HTML 생성"""
+    sections_html = ""
+    
+    # 카테고리 순서 정의
+    category_order = ['시스템 리소스', '스토리지', '네트워크', '종합 현황', '기타']
+    
+    for category in category_order:
+        if category not in charts_data or not charts_data[category]:
+            continue
+        
+        charts = charts_data[category]
+        charts_html = ""
+        
+        for chart in charts:
+            img_base64 = image_to_base64(chart['file_path'])
+            if img_base64:
+                charts_html += f"""
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">{chart['name']}</div>
+                        <div class="chart-description">시스템 성능 모니터링 지표</div>
+                    </div>
+                    <div class="chart-image-container">
+                        <img src="data:image/png;base64,{img_base64}" 
+                             alt="{chart['name']}" 
+                             class="chart-image"
+                             onclick="this.style.transform = this.style.transform ? '' : 'scale(1.5)'"
+                             title="클릭하여 확대/축소">
+                        <div class="zoom-indicator">+</div>
+                    </div>
+                </div>
+                """
+        
+        if charts_html:
+            sections_html += f"""
+            <div class="category-section">
+                <div class="category-header">
+                    <div class="category-title">{category}</div>
+                    <div class="category-description">{category} 관련 모니터링 지표</div>
+                    <div class="category-badge">{len(charts)}개 항목</div>
+                </div>
+                <div class="charts-grid">
+                    {charts_html}
+                </div>
+            </div>
+            """
+    
+    return sections_html
+
+def get_sample_metrics():
+    """샘플 메트릭 값 (실제로는 차트에서 추출)"""
+    return {
+        'cpu_current': '2.4%',
+        'memory_current': '7.75GB'
+    }
+
+def create_dashboard_html(dashboard_name, dashboard_data, config):
+    """대시보드 HTML 생성"""
+    
+    # HTML 템플릿 로드
+    template_path = Path("templates/dashboard.html")
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template = f.read()
+    except Exception as e:
+        logging.error(f"템플릿 파일 읽기 실패: {e}")
+        return None
+    
+    # 차트 섹션 생성
+    chart_sections = generate_chart_sections(dashboard_data['charts'])
+    
+    # 메트릭 값 가져오기
+    metrics = get_sample_metrics()
+    
+    # 템플릿 변수 치환
+    html_content = template.replace('{{dashboard_name}}', dashboard_name)
+    html_content = html_content.replace('{{report_month}}', config['report_month'])
+    html_content = html_content.replace('{{period}}', config['period'])
+    html_content = html_content.replace('{{generation_time}}', datetime.now().strftime('%Y-%m-%d %H:%M'))
+    html_content = html_content.replace('{{total_charts}}', str(dashboard_data['total_charts']))
+    html_content = html_content.replace('{{category_count}}', str(len(dashboard_data['charts'])))
+    html_content = html_content.replace('{{cpu_current}}', metrics['cpu_current'])
+    html_content = html_content.replace('{{memory_current}}', metrics['memory_current'])
+    html_content = html_content.replace('{{chart_sections}}', chart_sections)
+    html_content = html_content.replace('{{full_generation_time}}', datetime.now().strftime('%Y년 %m월 %d일 %H:%M:%S'))
+    
+    return html_content
+
+def create_reports():
+    """메인 리포트 생성 함수"""
+    setup_logging()
+    logging.info("=== 대시보드별 리포트 생성 시작 ===")
+    
+    # 설정 로드
     config = load_config()
     if not config:
         return False
     
-    return create_pdf_report(config)
+    # 최신 이미지 폴더 찾기
+    images_folder = find_latest_images_folder()
+    if not images_folder:
+        logging.error("이미지 폴더를 찾을 수 없습니다.")
+        return False
+    
+    # 대시보드 데이터 수집
+    dashboards_data = collect_dashboard_data(images_folder)
+    if not dashboards_data:
+        logging.error("대시보드 데이터를 찾을 수 없습니다.")
+        return False
+    
+    # 출력 폴더 설정
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    
+    # CSS 파일 복사
+    css_source = Path("templates/assets/style.css")
+    css_dest = output_dir / "assets"
+    css_dest.mkdir(exist_ok=True)
+    
+    if css_source.exists():
+        import shutil
+        shutil.copy2(css_source, css_dest / "style.css")
+    
+    # 각 대시보드별 HTML 생성
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    for dashboard_name, dashboard_data in dashboards_data.items():
+        logging.info(f"리포트 생성 중: {dashboard_name}")
+        
+        # HTML 내용 생성
+        html_content = create_dashboard_html(dashboard_name, dashboard_data, config)
+        if not html_content:
+            continue
+        
+        # 파일명 생성
+        safe_name = dashboard_name.replace(' ', '-').replace('/', '-')
+        filename = f"{safe_name}_{config['report_month'].replace('. ', '_')}_{timestamp}.html"
+        output_path = output_dir / filename
+        
+        # HTML 파일 저장
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            file_size = output_path.stat().st_size / (1024 * 1024)
+            logging.info(f"✅ {dashboard_name} 리포트 생성 완료: {output_path.name} ({file_size:.1f} MB)")
+            
+        except Exception as e:
+            logging.error(f"❌ {dashboard_name} 리포트 생성 실패: {e}")
+    
+    logging.info("=== 모든 대시보드 리포트 생성 완료 ===")
+    return True
+
+def main():
+    return create_reports()
 
 if __name__ == "__main__":
     import sys

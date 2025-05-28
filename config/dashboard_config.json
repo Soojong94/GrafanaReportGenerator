@@ -1,0 +1,41 @@
+{
+  "dashboards": {
+    "Mail-Server": {
+      "display_name": "메일 서버 모니터링 리포트",
+      "description": "메일 시스템 성능 및 리소스 사용량 분석",
+      "color": "#e74c3c"
+    },
+    "Main-Prometheus": {
+      "display_name": "프로메테우스 모니터링 리포트",
+      "description": "모니터링 시스템 성능 및 메트릭 수집 현황",
+      "color": "#f39c12"
+    }
+  },
+  "chart_categories": {
+    "cpu": {
+      "name": "CPU 사용률",
+      "category": "시스템 리소스",
+      "order": 1
+    },
+    "memory": {
+      "name": "메모리 사용률", 
+      "category": "시스템 리소스",
+      "order": 2
+    },
+    "disk": {
+      "name": "디스크 현황",
+      "category": "스토리지",
+      "order": 3
+    },
+    "network": {
+      "name": "네트워크 I/O",
+      "category": "네트워크",
+      "order": 4
+    },
+    "total": {
+      "name": "종합 현황",
+      "category": "요약",
+      "order": 5
+    }
+  }
+}
