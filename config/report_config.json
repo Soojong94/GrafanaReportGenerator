@@ -1,0 +1,19 @@
+{
+    "organization": "보령시농업기술센터",
+    "report_month": "2025. 05",
+    "period": "2025-05-01 ~ 2025-05-31",
+    "company_logo": true,
+    "grafana_servers": [
+        {
+            "name": "Production-Server",
+            "url": "175.45.222.66:3000",
+            "token": ""
+        }
+    ],
+    "report_settings": {
+        "include_storage_details": true,
+        "charts_per_page": 4,
+        "exclude_disk_rw_alerts": true,
+        "time_range": "30d"
+    }
+}
