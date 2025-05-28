@@ -64,6 +64,34 @@ def load_server_info():
         logging.error(f"서버 정보 설정 파일 읽기 실패: {e}")
         return None
 
+def get_next_version_filename(output_dir, base_filename):
+    """중복되지 않는 버전 파일명 생성"""
+    base_path = output_dir / base_filename
+    
+    # 파일이 존재하지 않으면 원본 파일명 반환
+    if not base_path.exists():
+        return base_filename
+    
+    # 파일명과 확장자 분리
+    name_part = base_path.stem
+    ext_part = base_path.suffix
+    
+    # 버전 번호 찾기
+    version = 1
+    while True:
+        versioned_filename = f"{name_part}_v{version:03d}{ext_part}"
+        versioned_path = output_dir / versioned_filename
+        
+        if not versioned_path.exists():
+            return versioned_filename
+        
+        version += 1
+        
+        # 무한 루프 방지 (최대 999 버전까지)
+        if version > 999:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return f"{name_part}_{timestamp}{ext_part}"
+
 def find_latest_images_folder():
     """최신 이미지 폴더 찾기"""
     images_dir = Path("images")
@@ -205,14 +233,29 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
     
     # 서버 정보 동적으로 가져오기
     server_details = {}
-    if server_info and 'Production-Server' in server_info.get('servers', {}):
-        server_details = server_info['servers']['Production-Server']
-        logging.info("서버 정보를 JSON에서 동적으로 로드했습니다.")
-    else:
+    if server_info:
+        # Production-Server에서 해당 대시보드와 매칭되는 서버 찾기
+        servers = server_info.get('servers', {})
+        
+        # 대시보드 설정에서 서버 매핑 확인
+        if dashboard_config and dashboard_name in dashboard_config.get('dashboards', {}):
+            mapped_servers = dashboard_config['dashboards'][dashboard_name].get('servers', [])
+            for server_name in mapped_servers:
+                if server_name in servers:
+                    server_details = servers[server_name]
+                    logging.info(f"서버 정보를 매핑했습니다: {dashboard_name} -> {server_name}")
+                    break
+        
+        # 매핑이 없으면 기본 Production-Server 사용
+        if not server_details and 'Production-Server' in servers:
+            server_details = servers['Production-Server']
+            logging.info("기본 Production-Server 정보를 사용합니다.")
+    
+    if not server_details:
         logging.warning("서버 정보 JSON을 찾을 수 없어 기본값을 사용합니다.")
     
     # 서버 정보 (JSON에서 동적으로 가져옴)
-    server_display_name = server_details.get('display_name', 'Production Server')
+    server_display_name = server_details.get('display_name', f'{dashboard_name} Server')
     hostname = server_details.get('hostname', 'server-01')
     os_info = server_details.get('os', 'ubuntu-20.04')
     cpu_mem = server_details.get('cpu_mem', '4vCPU / 16GB Mem')
@@ -561,11 +604,6 @@ def create_reports():
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
     
-    # 기존 파일들 정리
-    for item in output_dir.iterdir():
-        if item.is_file() and item.suffix == '.html':
-            item.unlink()
-    
     # 각 대시보드별 HTML 생성
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
@@ -575,10 +613,13 @@ def create_reports():
         # HTML 내용 생성
         html_content = create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_config, server_info)
         
-        # 파일명 생성
+        # 기본 파일명 생성
         safe_name = dashboard_name.replace(' ', '-').replace('/', '-')
-        filename = f"{safe_name}_{config['report_month'].replace('. ', '_')}_{timestamp}.html"
-        output_path = output_dir / filename
+        base_filename = f"{safe_name}_{config['report_month'].replace('. ', '_')}_{timestamp}.html"
+        
+        # 중복되지 않는 파일명 생성
+        final_filename = get_next_version_filename(output_dir, base_filename)
+        output_path = output_dir / final_filename
         
         # HTML 파일 저장
         try:
@@ -586,7 +627,11 @@ def create_reports():
                 f.write(html_content)
             
             file_size = output_path.stat().st_size / (1024 * 1024)
-            logging.info(f"✅ {dashboard_name} 리포트 생성 완료: {output_path.name} ({file_size:.1f} MB)")
+            
+            if final_filename != base_filename:
+                logging.info(f"✅ {dashboard_name} 리포트 생성 완료 (버전 생성): {final_filename} ({file_size:.1f} MB)")
+            else:
+                logging.info(f"✅ {dashboard_name} 리포트 생성 완료: {final_filename} ({file_size:.1f} MB)")
             
         except Exception as e:
             logging.error(f"❌ {dashboard_name} 리포트 생성 실패: {e}")
