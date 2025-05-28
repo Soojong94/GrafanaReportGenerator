@@ -257,7 +257,7 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
                 <div class="company-info">
                     <div class="company-name">으뜸정보기술</div>
                     <div class="company-details">
-                        웹사이트: cloud.tbit.co.kr | 문의: info@allrightit.co.kr
+                        웹사이트: cloud.tbit.co.kr 
                     </div>
                 </div>
                 <div class="report-info">
