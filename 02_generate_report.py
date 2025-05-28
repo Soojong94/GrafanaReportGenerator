@@ -136,6 +136,10 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
     display_name = dashboard_info.get('display_name', dashboard_name)
     description = dashboard_info.get('description', f'{dashboard_name} 시스템 모니터링')
     
+    # 서버 정보 가져오기 (기본값: 단일 서버)
+    servers = dashboard_info.get('servers', [dashboard_name])
+    server_display = ', '.join(servers)
+    
     # 이미지를 base64로 변환
     def image_to_base64(image_path):
         try:
@@ -146,6 +150,7 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
             return ""
     
     html_content = f"""<!DOCTYPE html>
+
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -166,46 +171,58 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
                     <div class="meta-value">{config['period']}</div>
                 </div>
                 <div class="meta-item">
-                    <div class="meta-label">차트 수</div>
-                    <div class="meta-value">{dashboard_data['total_charts']}개</div>
+                    <div class="meta-label">서버 정보</div>
+                    <div class="meta-value">{server_display}</div>
                 </div>
                 <div class="meta-item">
-                    <div class="meta-label">생성 시간</div>
-                    <div class="meta-value">{datetime.now().strftime('%H:%M')}</div>
+                    <div class="meta-label">리포트 유형</div>
+                    <div class="meta-value">월간 종합 모니터링</div>
                 </div>
             </div>
         </div>
         
         <div class="summary-stats">
             <div class="stat-card">
-                <span class="stat-number">{dashboard_data['total_charts']}</span>
-                <div class="stat-label">총 차트 수</div>
+                <span class="stat-number">30</span>
+                <div class="stat-label">모니터링 기간 (일)</div>
             </div>
             <div class="stat-card">
-                <span class="stat-number">{len(dashboard_data['charts'])}</span>
-                <div class="stat-label">카테고리 수</div>
+                <span class="stat-number">정상</span>
+                <div class="stat-label">서버 상태</div>
             </div>
             <div class="stat-card">
-                <span class="stat-number">{config['report_month']}</span>
-                <div class="stat-label">리포트 월</div>
+                <span class="stat-number">99.9%</span>
+                <div class="stat-label">데이터 수집률</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">0건</span>
+                <div class="stat-label">알림 발생</div>
             </div>
         </div>
 """
     
-    # 카테고리별 차트 섹션 생성
-    category_order = ['시스템 리소스', '스토리지', '네트워크', '요약', '기타']
+    # 카테고리별 차트 섹션 생성 - '요약'을 맨 앞으로 이동
+    category_order = ['요약', '시스템 리소스', '스토리지', '네트워크', '기타']
+    category_descriptions = {
+        '요약': '시스템 전반적인 상태 및 핵심 지표 요약',
+        '시스템 리소스': 'CPU, 메모리, 디스크 사용률 현황',
+        '스토리지': '저장 공간 사용량 및 I/O 성능',
+        '네트워크': '네트워크 트래픽 및 연결 상태',
+        '기타': '기타 모니터링 지표'
+    }
     
     for category in category_order:
         if category not in dashboard_data['charts'] or not dashboard_data['charts'][category]:
             continue
         
         charts = dashboard_data['charts'][category]
+        category_desc = category_descriptions.get(category, f'{category} 관련 모니터링 지표')
         
         html_content += f"""
         <div class="category-section">
             <div class="category-header">
                 <div class="category-title">{category}</div>
-                <div class="category-description">{category} 관련 모니터링 지표</div>
+                <div class="category-description">{category_desc}</div>
                 <div class="category-badge">{len(charts)}개 항목</div>
             </div>
             <div class="charts-grid">
@@ -223,10 +240,7 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
                     <div class="chart-image-container">
                         <img src="data:image/png;base64,{img_base64}" 
                              alt="{chart['name']}" 
-                             class="chart-image"
-                             onclick="this.style.transform = this.style.transform ? '' : 'scale(1.5)'"
-                             title="클릭하여 확대/축소">
-                        <div class="zoom-indicator">+</div>
+                             class="chart-image">
                     </div>
                 </div>
 """
@@ -239,12 +253,20 @@ def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_conf
     # 푸터 추가
     html_content += f"""
         <div class="report-footer">
-            <div class="footer-text">
-                이 리포트는 Grafana Report Generator를 통해 자동 생성되었습니다.<br>
-                모든 데이터는 {config['period']} 기간의 모니터링 결과입니다.
+            <div class="footer-main">
+                <div class="company-info">
+                    <div class="company-name">으뜸정보기술</div>
+                    <div class="company-details">
+                        웹사이트: cloud.tbit.co.kr | 문의: info@allrightit.co.kr
+                    </div>
+                </div>
+                <div class="report-info">
+                    <div class="report-version">Report Version 1.0</div>
+                    <div class="security-level">보안등급: 내부용</div>
+                </div>
             </div>
-            <div class="generation-time">
-                생성 일시: {datetime.now().strftime('%Y년 %m월 %d일 %H:%M:%S')}
+            <div class="copyright">
+                © 2025 으뜸정보기술. All Rights Reserved.
             </div>
         </div>
     </div>
