@@ -4,7 +4,9 @@ import base64
 from pathlib import Path
 from datetime import datetime
 import logging
+import shutil
 from collections import defaultdict
+import fnmatch
 
 def setup_logging():
     logging.basicConfig(
@@ -14,119 +16,209 @@ def setup_logging():
     )
 
 def load_config():
+    """기본 설정 로드"""
     config_path = Path("config/report_config.json")
+    if not config_path.exists():
+        logging.error(f"설정 파일을 찾을 수 없습니다: {config_path}")
+        return None
+    
     try:
         with open(config_path, 'r', encoding='utf-8-sig') as f:
-            return json.load(f)
+            config = json.load(f)
+            logging.info("기본 설정 파일 로드 완료")
+            return config
     except Exception as e:
         logging.error(f"설정 파일 읽기 실패: {e}")
         return None
 
+def load_dashboard_config():
+    """대시보드 설정 로드"""
+    config_path = Path("config/dashboard_config.json")
+    if not config_path.exists():
+        logging.warning("대시보드 설정 파일이 없습니다. 기본 설정을 사용합니다.")
+        return None
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            logging.info("대시보드 설정 파일 로드 완료")
+            return config
+    except Exception as e:
+        logging.error(f"대시보드 설정 파일 읽기 실패: {e}")
+        return None
+
 def find_latest_images_folder():
+    """최신 이미지 폴더 찾기"""
     images_dir = Path("images")
     if not images_dir.exists():
+        logging.error("images 폴더를 찾을 수 없습니다.")
         return None
     
     timestamp_folders = [d for d in images_dir.iterdir() if d.is_dir()]
     if not timestamp_folders:
+        logging.error("이미지 폴더에서 다운로드된 데이터를 찾을 수 없습니다.")
         return None
     
-    return max(timestamp_folders, key=lambda x: x.stat().st_mtime)
+    latest_folder = max(timestamp_folders, key=lambda x: x.stat().st_mtime)
+    logging.info(f"사용할 이미지 폴더: {latest_folder}")
+    return latest_folder
 
-def categorize_chart(filename):
-    """파일명으로 카테고리 자동 분류"""
+def categorize_chart(filename, dashboard_config):
+    """파일명을 기반으로 차트 카테고리 분류"""
+    if not dashboard_config:
+        return "기타", filename.replace('.png', '').replace('_', ' ').title()
+    
     filename_lower = filename.lower()
     
-    if 'total' in filename_lower:
-        return '종합 현황'
-    elif any(x in filename_lower for x in ['cpu', 'memory']):
-        return '시스템 리소스'
-    elif 'disk' in filename_lower:
-        return '스토리지'
-    elif 'network' in filename_lower:
-        return '네트워크'
-    else:
-        return '기타'
+    for category_key, category_info in dashboard_config.get('chart_categories', {}).items():
+        if category_key in filename_lower:
+            return category_info['category'], category_info['name']
+    
+    return "기타", filename.replace('.png', '').replace('_', ' ').title()
 
-def get_chart_name(filename):
-    """파일명에서 차트 이름 추출"""
-    name = filename.replace('.png', '').replace('_', ' ')
-    # 파일명 끝의 숫자 제거 (예: "Cpu Usage 2" -> "Cpu Usage")
-    parts = name.split()
-    if parts and parts[-1].isdigit():
-        parts = parts[:-1]
-    return ' '.join(parts).title()
-
-def collect_dashboard_data(images_folder):
+def collect_dashboard_data(images_folder, dashboard_config):
     """대시보드별 데이터 수집"""
     dashboards_data = {}
     
+    # Production-Server 폴더 찾기
     production_folder = images_folder / "Production-Server"
     if not production_folder.exists():
+        logging.error("Production-Server 폴더를 찾을 수 없습니다.")
         return dashboards_data
     
+    # 각 대시보드 폴더 처리
     for dashboard_folder in production_folder.iterdir():
         if not dashboard_folder.is_dir():
             continue
         
         dashboard_name = dashboard_folder.name
+        logging.info(f"대시보드 처리 중: {dashboard_name}")
+        
+        # 대시보드 정보 가져오기
+        dashboard_info = {}
+        if dashboard_config and dashboard_name in dashboard_config.get('dashboards', {}):
+            dashboard_info = dashboard_config['dashboards'][dashboard_name]
+        
+        # 차트 파일들 수집
         chart_files = list(dashboard_folder.glob("*.png"))
         
         # 카테고리별로 분류
         categorized_charts = defaultdict(list)
         
         for chart_file in chart_files:
-            category = categorize_chart(chart_file.name)
-            chart_name = get_chart_name(chart_file.name)
+            category, chart_name = categorize_chart(chart_file.name, dashboard_config)
             
-            categorized_charts[category].append({
-                'name': chart_name,
+            chart_info = {
                 'file_path': chart_file,
+                'name': chart_name,
                 'filename': chart_file.name
-            })
+            }
+            
+            categorized_charts[category].append(chart_info)
         
         # 카테고리별 정렬
         for category in categorized_charts:
             categorized_charts[category].sort(key=lambda x: x['name'])
         
         dashboards_data[dashboard_name] = {
+            'info': dashboard_info,
             'charts': dict(categorized_charts),
-            'total_charts': len(chart_files)
+            'total_charts': len(chart_files),
+            'folder_path': dashboard_folder
         }
     
     return dashboards_data
 
-def image_to_base64(image_path):
-    """이미지를 base64로 변환"""
-    try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    except Exception as e:
-        logging.warning(f"이미지 변환 실패 {image_path}: {e}")
-        return ""
-
-def generate_chart_sections(charts_data):
-    """차트 섹션 HTML 생성"""
-    sections_html = ""
+def create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_config):
+    """개별 대시보드 HTML 생성"""
     
-    # 카테고리 순서 정의
-    category_order = ['시스템 리소스', '스토리지', '네트워크', '종합 현황', '기타']
+    dashboard_info = dashboard_data['info']
+    display_name = dashboard_info.get('display_name', dashboard_name)
+    description = dashboard_info.get('description', f'{dashboard_name} 시스템 모니터링')
+    
+    # 이미지를 base64로 변환
+    def image_to_base64(image_path):
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        except Exception as e:
+            logging.warning(f"이미지 변환 실패 {image_path}: {e}")
+            return ""
+    
+    html_content = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{display_name} - {config['report_month']}</title>
+    <style>
+        {get_css_content()}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="report-header">
+            <h1>{display_name}</h1>
+            <div class="report-subtitle">{description}</div>
+            <div class="report-meta">
+                <div class="meta-item">
+                    <div class="meta-label">리포트 기간</div>
+                    <div class="meta-value">{config['period']}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">차트 수</div>
+                    <div class="meta-value">{dashboard_data['total_charts']}개</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">생성 시간</div>
+                    <div class="meta-value">{datetime.now().strftime('%H:%M')}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="summary-stats">
+            <div class="stat-card">
+                <span class="stat-number">{dashboard_data['total_charts']}</span>
+                <div class="stat-label">총 차트 수</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">{len(dashboard_data['charts'])}</span>
+                <div class="stat-label">카테고리 수</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">{config['report_month']}</span>
+                <div class="stat-label">리포트 월</div>
+            </div>
+        </div>
+"""
+    
+    # 카테고리별 차트 섹션 생성
+    category_order = ['시스템 리소스', '스토리지', '네트워크', '요약', '기타']
     
     for category in category_order:
-        if category not in charts_data or not charts_data[category]:
+        if category not in dashboard_data['charts'] or not dashboard_data['charts'][category]:
             continue
         
-        charts = charts_data[category]
-        charts_html = ""
+        charts = dashboard_data['charts'][category]
+        
+        html_content += f"""
+        <div class="category-section">
+            <div class="category-header">
+                <div class="category-title">{category}</div>
+                <div class="category-description">{category} 관련 모니터링 지표</div>
+                <div class="category-badge">{len(charts)}개 항목</div>
+            </div>
+            <div class="charts-grid">
+"""
         
         for chart in charts:
             img_base64 = image_to_base64(chart['file_path'])
             if img_base64:
-                charts_html += f"""
+                html_content += f"""
                 <div class="chart-card">
                     <div class="chart-header">
                         <div class="chart-title">{chart['name']}</div>
-                        <div class="chart-description">시스템 성능 모니터링 지표</div>
+                        <div class="chart-description">시스템 성능 및 리소스 사용량 추이</div>
                     </div>
                     <div class="chart-image-container">
                         <img src="data:image/png;base64,{img_base64}" 
@@ -137,81 +229,66 @@ def generate_chart_sections(charts_data):
                         <div class="zoom-indicator">+</div>
                     </div>
                 </div>
-                """
+"""
         
-        if charts_html:
-            sections_html += f"""
-            <div class="category-section">
-                <div class="category-header">
-                    <div class="category-title">{category}</div>
-                    <div class="category-description">{category} 관련 모니터링 지표</div>
-                    <div class="category-badge">{len(charts)}개 항목</div>
-                </div>
-                <div class="charts-grid">
-                    {charts_html}
-                </div>
+        html_content += """
             </div>
-            """
+        </div>
+"""
     
-    return sections_html
-
-def get_sample_metrics():
-    """샘플 메트릭 값 (실제로는 차트에서 추출)"""
-    return {
-        'cpu_current': '2.4%',
-        'memory_current': '7.75GB'
-    }
-
-def create_dashboard_html(dashboard_name, dashboard_data, config):
-    """대시보드 HTML 생성"""
-    
-    # HTML 템플릿 로드
-    template_path = Path("templates/dashboard.html")
-    try:
-        with open(template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
-    except Exception as e:
-        logging.error(f"템플릿 파일 읽기 실패: {e}")
-        return None
-    
-    # 차트 섹션 생성
-    chart_sections = generate_chart_sections(dashboard_data['charts'])
-    
-    # 메트릭 값 가져오기
-    metrics = get_sample_metrics()
-    
-    # 템플릿 변수 치환
-    html_content = template.replace('{{dashboard_name}}', dashboard_name)
-    html_content = html_content.replace('{{report_month}}', config['report_month'])
-    html_content = html_content.replace('{{period}}', config['period'])
-    html_content = html_content.replace('{{generation_time}}', datetime.now().strftime('%Y-%m-%d %H:%M'))
-    html_content = html_content.replace('{{total_charts}}', str(dashboard_data['total_charts']))
-    html_content = html_content.replace('{{category_count}}', str(len(dashboard_data['charts'])))
-    html_content = html_content.replace('{{cpu_current}}', metrics['cpu_current'])
-    html_content = html_content.replace('{{memory_current}}', metrics['memory_current'])
-    html_content = html_content.replace('{{chart_sections}}', chart_sections)
-    html_content = html_content.replace('{{full_generation_time}}', datetime.now().strftime('%Y년 %m월 %d일 %H:%M:%S'))
+    # 푸터 추가
+    html_content += f"""
+        <div class="report-footer">
+            <div class="footer-text">
+                이 리포트는 Grafana Report Generator를 통해 자동 생성되었습니다.<br>
+                모든 데이터는 {config['period']} 기간의 모니터링 결과입니다.
+            </div>
+            <div class="generation-time">
+                생성 일시: {datetime.now().strftime('%Y년 %m월 %d일 %H:%M:%S')}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
     
     return html_content
+
+def get_css_content():
+    """CSS 내용 반환 (위에서 정의한 CSS)"""
+    css_file = Path("templates/assets/style.css")
+    if css_file.exists():
+        try:
+            with open(css_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logging.warning(f"CSS 파일 읽기 실패: {e}")
+    
+    # CSS 파일이 없으면 기본 CSS 사용 (위에서 정의한 CSS 내용)
+    return """
+        /* 위에서 정의한 CSS 내용을 여기에 복사 */
+        :root { --primary-color: #2c5aa0; /* ... 나머지 CSS ... */ }
+    """
 
 def create_reports():
     """메인 리포트 생성 함수"""
     setup_logging()
     logging.info("=== 대시보드별 리포트 생성 시작 ===")
     
-    # 설정 로드
+    # 설정 파일들 로드
     config = load_config()
     if not config:
         return False
     
+    dashboard_config = load_dashboard_config()
+    
     # 최신 이미지 폴더 찾기
     images_folder = find_latest_images_folder()
     if not images_folder:
-        logging.error("이미지 폴더를 찾을 수 없습니다.")
         return False
     
     # 대시보드 데이터 수집
-    dashboards_data = collect_dashboard_data(images_folder)
+    dashboards_data = collect_dashboard_data(images_folder, dashboard_config)
     if not dashboards_data:
         logging.error("대시보드 데이터를 찾을 수 없습니다.")
         return False
@@ -220,14 +297,10 @@ def create_reports():
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
     
-    # CSS 파일 복사
-    css_source = Path("templates/assets/style.css")
-    css_dest = output_dir / "assets"
-    css_dest.mkdir(exist_ok=True)
-    
-    if css_source.exists():
-        import shutil
-        shutil.copy2(css_source, css_dest / "style.css")
+    # 기존 파일들 정리
+    for item in output_dir.iterdir():
+        if item.is_file() and item.suffix == '.html':
+            item.unlink()
     
     # 각 대시보드별 HTML 생성
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -236,9 +309,7 @@ def create_reports():
         logging.info(f"리포트 생성 중: {dashboard_name}")
         
         # HTML 내용 생성
-        html_content = create_dashboard_html(dashboard_name, dashboard_data, config)
-        if not html_content:
-            continue
+        html_content = create_dashboard_html(dashboard_name, dashboard_data, config, dashboard_config)
         
         # 파일명 생성
         safe_name = dashboard_name.replace(' ', '-').replace('/', '-')
