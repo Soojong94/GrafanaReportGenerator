@@ -4,7 +4,7 @@
       "display_name": "메일 시스템 모니터링",
       "description": "메일 시스템 성능 및 리소스 사용량 분석",
       "color": "#e74c3c",
-      "servers": ["Mail-Server"]
+      "servers": ["mail-Server"]
     },
     "Main-Prometheus": {
       "display_name": "모니터링 시스템",
@@ -12,39 +12,33 @@
       "color": "#f39c12",
       "servers": ["Prometheus-Server"]
     }
-    // 향후 추가될 시스템 예시:
-    // "Boryeong-AgriTech": {
-    //   "display_name": "보령 농업기술센터 시스템 모니터링",
-    //   "description": "통합 시스템 성능 및 리소스 사용량 분석",
-    //   "color": "#3498db",
-    //   "servers": ["WEB-Server", "WAS-Server", "DB-Server"]
-    // }
   },
   "chart_categories": {
-    "total": {
-      "name": "종합 현황",
-      "category": "요약",
-      "order": 1
-    },
     "cpu": {
       "name": "CPU 사용률",
       "category": "시스템 리소스",
-      "order": 2
+      "order": 1
     },
     "memory": {
       "name": "메모리 사용률",
       "category": "시스템 리소스",
-      "order": 3
+      "order": 2
     },
     "disk": {
       "name": "디스크 현황",
       "category": "스토리지",
-      "order": 4
+      "order": 3
     },
     "network": {
       "name": "네트워크 I/O",
       "category": "네트워크",
-      "order": 5
+      "order": 4
     }
+  },
+  "chart_descriptions": {
+    "cpu": "CPU 사용률 및 부하 상태 모니터링",
+    "memory": "메모리 사용량 및 가용 공간 추적",
+    "disk": "디스크 I/O 성능 및 사용량 분석",
+    "network": "네트워크 트래픽 모니터링"
   }
 }

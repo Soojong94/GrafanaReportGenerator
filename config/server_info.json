@@ -1,0 +1,27 @@
+{
+  "servers": {
+    "Production-Server": {
+      "display_name": "메일 서버 시스템",
+      "hostname": "mail-server-01",
+      "os": "ubuntu-20.04",
+      "cpu_mem": "(Standard) 4vCPU / 16GB Mem",
+      "disk": "100 GB / 500 GB",
+      "availability": "100%",
+      "summary": {
+        "total_alerts": {
+          "value": 0,
+          "label": "전체"
+        },
+        "critical_alerts": {
+          "value": 0,
+          "label": "긴급"
+        },
+        "warning_alerts": {
+          "value": 0,
+          "label": "경고"
+        },
+        "top5_note": "test1, test1test1st1test1test1."
+      }
+    }
+  }
+}
