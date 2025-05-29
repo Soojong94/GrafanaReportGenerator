@@ -1,20 +1,20 @@
 {
   "_metadata": {
     "version": "2.0",
-    "description": "그라파나 리포트 생성기 통합 설정",
-    "created": "2025-05-29",
-    "last_updated": "auto-generated"
+    "description": "Grafana Report Generator Unified Configuration",
+    "created": "2025-05-29", 
+    "last_updated": "2025-05-29 11:31:57"
   },
   "report_settings": {
-    "report_month": "2025. 05",
-    "period": "2025-05-01 ~ 2025-05-31",
+    "report_month": "2025. 04",
+    "period": "2025-04-01 ~ 2025-04-30",
     "default_year": 2025,
-    "default_month": 5,
+    "default_month": 4,
     "charts_per_page": 4,
     "time_range": "30d",
     "include_storage_details": true,
-    "grafana_time_from": "2025-05-01",
-    "grafana_time_to": "2025-05-31"
+    "grafana_time_from": "2025-04-01",
+    "grafana_time_to": "2025-04-30"
   },
   "grafana_servers": [
     {
@@ -25,121 +25,146 @@
   ],
   "servers": {
     "Mail-Server": {
-      "display_name": "메일 서버 시스템",
+      "display_name": "Mail Server System",
       "hostname": "mail-server-01",
       "os": "ubuntu-20.04",
       "cpu_mem": "(Standard) 4vCPU / 16GB Mem",
       "disk": "100 GB / 500 GB",
       "availability": "100%",
       "summary": {
-        "total_alerts": {"value": 0, "label": "전체"},
-        "critical_alerts": {"value": 0, "label": "긴급"},
-        "warning_alerts": {"value": 0, "label": "경고"},
-        "top5_note": "메일 서버 관련 주요 알림이 없습니다."
+        "total_alerts": {
+          "value": 0,
+          "label": "Total"
+        },
+        "critical_alerts": {
+          "value": 0,
+          "label": "Critical"
+        },
+        "warning_alerts": {
+          "value": 0,
+          "label": "Warning"
+        },
+        "top5_note": "No critical alerts for mail server."
       }
     },
     "Main-Prometheus": {
-      "display_name": "프로메테우스 모니터링 시스템",
+      "display_name": "Prometheus Monitoring System",
       "hostname": "prometheus-01",
       "os": "ubuntu-20.04",
       "cpu_mem": "(Standard) 4vCPU / 16GB Mem",
       "disk": "500 GB / 2TB",
       "availability": "99.99%",
       "summary": {
-        "total_alerts": {"value": 1, "label": "전체"},
-        "critical_alerts": {"value": 0, "label": "긴급"},
-        "warning_alerts": {"value": 1, "label": "경고"},
-        "top5_note": "스토리지 사용량 75% 경고"
+        "total_alerts": {
+          "value": 1,
+          "label": "Total"
+        },
+        "critical_alerts": {
+          "value": 0,
+          "label": "Critical"
+        },
+        "warning_alerts": {
+          "value": 1,
+          "label": "Warning"
+        },
+        "top5_note": "Storage usage 75% warning"
       }
     }
   },
   "dashboards": {
     "Mail-Server": {
-      "display_name": "메일 시스템 모니터링",
-      "description": "메일 시스템 성능 및 리소스 사용량 분석",
+      "display_name": "Mail System Monitoring",
+      "description": "Mail system performance and resource usage analysis",
       "color": "#e74c3c",
       "servers": ["Mail-Server"]
     },
     "Main-Prometheus": {
-      "display_name": "모니터링 시스템",
-      "description": "프로메테우스 및 그라파나 모니터링 현황",
+      "display_name": "Monitoring System",
+      "description": "Prometheus and Grafana monitoring status",
       "color": "#f39c12",
       "servers": ["Main-Prometheus"]
     }
   },
   "chart_categories": {
     "cpu": {
-      "name": "CPU 사용률",
-      "category": "시스템 리소스",
+      "name": "CPU Usage",
+      "category": "System Resources",
       "order": 1
     },
     "memory": {
-      "name": "메모리 사용률",
-      "category": "시스템 리소스",
+      "name": "Memory Usage",
+      "category": "System Resources",
       "order": 2
     },
     "disk": {
-      "name": "디스크 현황",
-      "category": "스토리지",
+      "name": "Disk Status",
+      "category": "Storage",
       "order": 3
     },
     "network": {
-      "name": "네트워크 I/O",
-      "category": "네트워크",
+      "name": "Network I/O",
+      "category": "Network",
       "order": 4
     },
     "prometheus": {
-      "name": "프로메테우스 메트릭",
-      "category": "모니터링",
+      "name": "Prometheus Metrics",
+      "category": "Monitoring",
       "order": 5
     },
     "grafana": {
-      "name": "그라파나 대시보드",
-      "category": "모니터링",
+      "name": "Grafana Dashboard",
+      "category": "Monitoring",
       "order": 6
     },
     "mail": {
-      "name": "메일 서비스",
-      "category": "애플리케이션",
+      "name": "Mail Service",
+      "category": "Applications",
       "order": 7
     },
     "smtp": {
-      "name": "SMTP 서비스",
-      "category": "애플리케이션",
+      "name": "SMTP Service",
+      "category": "Applications",
       "order": 8
     }
   },
   "chart_descriptions": {
-    "cpu": "CPU 사용률 및 부하 상태 모니터링",
-    "memory": "메모리 사용량 및 가용 공간 추적",
-    "disk": "디스크 I/O 성능 및 사용량 분석",
-    "network": "네트워크 트래픽 모니터링",
-    "prometheus": "프로메테우스 메트릭 수집 및 성능 지표",
-    "grafana": "그라파나 대시보드 성능 및 사용 현황",
-    "mail": "메일 서비스 처리량 및 성능 지표",
-    "smtp": "SMTP 서버 연결 및 처리 현황"
+    "cpu": "CPU usage and load status monitoring",
+    "memory": "Memory usage and available space tracking",
+    "disk": "Disk I/O performance and usage analysis",
+    "network": "Network traffic monitoring",
+    "prometheus": "Prometheus metrics collection and performance indicators",
+    "grafana": "Grafana dashboard performance and usage status",
+    "mail": "Mail service throughput and performance metrics",
+    "smtp": "SMTP server connection and processing status"
   },
   "groups": {
-    "통합모니터링": {
-      "display_name": "통합 인프라 모니터링 시스템",
-      "description": "메일 서버와 프로메테우스 모니터링 통합 현황",
+    "IntegratedMonitoring": {
+      "display_name": "Integrated Infrastructure Monitoring System",
+      "description": "Integrated status of mail server and Prometheus monitoring",
       "servers": ["Mail-Server", "Main-Prometheus"],
       "order": 1,
       "active": true
     },
-    "메일서버": {
-      "display_name": "메일 서버 모니터링",
-      "description": "메일 시스템 전용 성능 분석 및 현황",
+    "MailServer": {
+      "display_name": "Mail Server Monitoring",
+      "description": "Mail system dedicated performance analysis and status",
       "servers": ["Mail-Server"],
       "order": 2,
       "active": true
     },
-    "프로메테우스": {
-      "display_name": "프로메테우스 모니터링 시스템",
-      "description": "모니터링 인프라 성능 분석 및 현황",
+    "Prometheus": {
+      "display_name": "Prometheus Monitoring System",
+      "description": "Monitoring infrastructure performance analysis and status",
       "servers": ["Main-Prometheus", "Mail-Server"],
       "order": 3,
       "active": true
     }
+  },
+  "last_download": {
+    "timestamp": "20250529_113126",
+    "download_path": "D:\\GrafanaReportGenerator\\images\\20250529_113126",
+    "total_images": 12,
+    "success_images": 12,
+    "download_time": "2025-05-29 11:31:57"
   }
 }

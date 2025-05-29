@@ -1,8 +1,8 @@
-# 01_download_images.ps1 (통합 설정 기반)
+# 01_download_images.ps1 (Fixed Version)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-Write-Host "=== Grafana Image Downloader Start (통합 설정 기반) ==="
+Write-Host "=== Grafana Image Downloader Start (Unified Config Based) ==="
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $configFile = Join-Path $projectRoot "config\unified_config.json"
@@ -31,17 +31,17 @@ if (Test-Path $envFile) {
 
 # Load unified config file
 if (-not (Test-Path $configFile)) {
-    Write-Host "ERROR: 통합 설정 파일을 찾을 수 없습니다: $configFile"
-    Write-Host "config/unified_config.json 파일을 생성하거나 update_month.ps1을 실행하세요"
+    Write-Host "ERROR: Unified config file not found: $configFile"
+    Write-Host "Please create config/unified_config.json file or run update_month.ps1"
     exit 1
 }
 
 try {
     $config = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
     $servers = $config.grafana_servers
-    Write-Host "통합 설정 로드: $($servers.Count) servers"
+    Write-Host "Unified config loaded: $($servers.Count) servers"
 } catch {
-    Write-Host "ERROR: 통합 설정 파일 읽기 실패: $($_.Exception.Message)"
+    Write-Host "ERROR: Failed to read unified config file: $($_.Exception.Message)"
     exit 1
 }
 
@@ -123,9 +123,19 @@ function Download-GrafanaPanel {
         }
     }
     
-    $url = "http://$ServerUrl/render/d-solo/$DashboardUid" + 
-           "?orgId=1&panelId=$PanelId&width=1200&height=800&scale=1" +
-           "&from=$timeFrom&to=$timeTo&tz=Asia%2FSeoul"
+    # Fix: Properly escape URL parameters
+    $baseUrl = "http://$ServerUrl/render/d-solo/$DashboardUid"
+    $params = @(
+        "orgId=1",
+        "panelId=$PanelId",
+        "width=1200",
+        "height=800", 
+        "scale=1",
+        "from=$timeFrom",
+        "to=$timeTo",
+        "tz=Asia%2FSeoul"
+    )
+    $url = $baseUrl + "?" + ($params -join "&")
     
     $headers = @{"Authorization" = "Bearer $Token"}
     
@@ -142,7 +152,9 @@ function Download-GrafanaPanel {
 
 function Clean-SafeFileName {
     param([string]$Name)
-    return $Name -replace '[\\/:*?"<>|]', '_'
+    # Fix: Properly escape regex pattern
+    $invalidChars = '[\\/:*?"<>|]'
+    return $Name -replace $invalidChars, '_'
 }
 
 # Main execution
@@ -216,12 +228,12 @@ foreach ($server in $servers) {
     Write-Host "Server $($server.name) completed"
 }
 
-# Save results - 통합 설정 파일 업데이트
+# Save results - Update unified config file
 try {
-    # 기존 통합 설정 읽어서 업데이트
+    # Read existing unified config and update
     $originalConfig = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
     
-    # last_download 정보 추가/업데이트
+    # Add/update last_download info
     $lastDownloadInfo = @{
         "timestamp" = $timestamp
         "download_path" = $downloadDir
@@ -230,24 +242,24 @@ try {
         "download_time" = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
     
-    # PowerShell에서 JSON 객체에 속성 추가/업데이트
+    # Add property to PowerShell object
     if ($originalConfig.last_download) {
         $originalConfig.last_download = $lastDownloadInfo
     } else {
         $originalConfig | Add-Member -Type NoteProperty -Name "last_download" -Value $lastDownloadInfo
     }
     
-    # 메타데이터 업데이트
+    # Update metadata
     if ($originalConfig._metadata) {
         $originalConfig._metadata.last_updated = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
     
-    # 통합 설정 파일 저장
+    # Save unified config file
     $jsonContent = $originalConfig | ConvertTo-Json -Depth 10
     [System.IO.File]::WriteAllText($configFile, $jsonContent, [System.Text.UTF8Encoding]::new($false))
-    Write-Host "통합 설정 파일 업데이트 완료"
+    Write-Host "Unified config file updated successfully"
 } catch {
-    Write-Host "Warning: 통합 설정 파일 업데이트 실패: $($_.Exception.Message)"
+    Write-Host "Warning: Failed to update unified config file: $($_.Exception.Message)"
 }
 
 Write-Host ""
@@ -258,4 +270,4 @@ Write-Host "Failed: $($totalImages - $successImages)"
 Write-Host "Location: $downloadDir"
 Write-Host ""
 Write-Host "Image download completed successfully!"
-Write-Host "통합 설정 기반으로 다운로드가 완료되었습니다."
+Write-Host "Download completed based on unified configuration."
