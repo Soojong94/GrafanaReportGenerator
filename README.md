@@ -153,10 +153,6 @@ GrafanaReportGenerator/
 # 설정 파일 검증
 python enhanced_config_validator.py
 
-# 연결 테스트만
-powershell -File simple_download.ps1
-```
-
 ### 테스트 리포트 생성:
 ```bash
 # 테스트 월 설정
@@ -225,9 +221,6 @@ python enhanced_config_validator.py
 - 템플릿 파일들 존재 확인
 - Python 패키지 설치 확인
 
-**5. ~~report_config.json은 이제 사용 안 함~~**
-- v2.0부터는 `unified_config.json`만 사용
-- 기존 개별 설정 파일들은 `config/legacy/`로 이동 가능
 
 ## 💡 팁 및 권장사항
 
@@ -243,5 +236,3 @@ python enhanced_config_validator.py
 - **설정 도움**: `enhanced_config_validator.py` 실행으로 상세 오류 확인
 
 ---
-
-이제 **하나의 설정 파일**로 모든 것을 관리할 수 있습니다! 🎉
