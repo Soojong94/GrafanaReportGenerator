@@ -1,0 +1,40 @@
+{
+  "_comment": "=== 시스템 그룹 설정 가이드 ===",
+  "_usage": {
+    "description": "여러 서버를 하나의 시스템 그룹으로 묶어서 통합 리포트 생성",
+    "how_to_add_server": [
+      "1. 새 서버를 추가하려면 'groups' 객체 안의 해당 그룹에 서버명 추가",
+      "2. 서버명은 그라파나에서 다운로드된 폴더명과 일치해야 함",
+      "3. server_info.json에 해당 서버 정보도 추가해야 함",
+      "4. dashboard_config.json에 대시보드 설정도 추가해야 함"
+    ],
+    "example_new_server": {
+      "step1": "groups > 시스템1 > servers 배열에 'New-Server' 추가",
+      "step2": "server_info.json에 'New-Server' 정보 추가",
+      "step3": "dashboard_config.json에 'New-Server' 대시보드 설정 추가"
+    }
+  },
+  "groups": {
+    "시스템1": {
+      "display_name": "통합 서버 모니터링 시스템",
+      "description": "메일 시스템과 모니터링 시스템을 포함한 통합 인프라",
+      "servers": [
+        "Mail-Server",
+        "Main-Prometheus"
+      ],
+      "order": 1
+    }
+  },
+  "_future_example": {
+    "comment": "추가 시스템 그룹 예시 (필요시 활성화)",
+    "시스템2": {
+      "display_name": "웹 서비스 시스템",
+      "description": "웹 서버와 데이터베이스 서버 통합 모니터링",
+      "servers": [
+        "Web-Server",
+        "Database-Server"
+      ],
+      "order": 2
+    }
+  }
+}
