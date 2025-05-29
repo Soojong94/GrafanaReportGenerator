@@ -77,7 +77,7 @@ if not "!missing_templates!"=="" (
 :: 1단계: 이미지 다운로드
 echo [1/3] 그라파나 이미지 다운로드 중...
 echo.
-powershell -ExecutionPolicy Bypass -File "01_download_images.ps1"
+powershell -ExecutionPolicy RemoteSigned -File "01_download_images.ps1"
 
 if %ERRORLEVEL% neq 0 (
     echo.
