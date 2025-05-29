@@ -22,7 +22,7 @@
     "프로메테우스": {
       "display_name": "프로메테우스 모니터링 시스템",
       "description": "모니터링 인프라 성능 분석 및 현황",
-      "servers": ["Main-Prometheus"],
+      "servers": ["Main-Prometheus", "Mail-Server"],
       "order": 3,
       "active": true
     }
