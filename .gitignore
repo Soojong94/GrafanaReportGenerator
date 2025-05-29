@@ -1,7 +1,15 @@
 # 환경변수 파일 (민감한 정보 포함)
 .env
+
+# 통합 설정 파일 (실제 사용 파일)
 config/unified_config.json
-config/legacy
+
+# 레거시 설정 파일들
+config/legacy/
+config/system_groups.json
+config/server_info.json
+config/dashboard_config.json
+config/report_config.json
 
 # 이미지 및 결과물 폴더
 images/
