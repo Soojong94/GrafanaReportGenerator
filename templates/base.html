@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        /* CSS 내용이 여기에 직접 삽입됩니다 */
+        {{CSS_CONTENT}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="report-header">
+            <h1>{{GROUP_NAME}}</h1>
+            <div class="report-subtitle">{{GROUP_DESC}}</div>
+            <div class="report-meta">
+                <div class="meta-item">
+                    <div class="meta-label">리포트 기간</div>
+                    <div class="meta-value">{{PERIOD}}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">리포트 유형</div>
+                    <div class="meta-value">월간 서버 모니터링</div>
+                </div>
+            </div>
+        </div>
+        
+        {{CONTENT}}
+        
+        <div class="report-footer">
+            <div class="footer-main">
+                <div class="company-info">
+                    <div class="company-name">으뜸정보기술</div>
+                    <div class="company-details">웹사이트: cloud.tbit.co.kr</div>
+                </div>
+                <div class="report-info">
+                    <div class="report-version">Report Version 2.0</div>
+                    <div class="security-level">보안등급: 내부용</div>
+                </div>
+            </div>
+            <div class="copyright">© 2025 으뜸정보기술. All Rights Reserved.</div>
+        </div>
+    </div>
+</body>
+</html>

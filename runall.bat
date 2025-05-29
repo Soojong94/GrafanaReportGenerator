@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 echo.
 echo ==========================================
-echo   그라파나 서버 모니터링 리포트 생성
+echo   그라파나 서버 모니터링 리포트 생성 v2.0
 echo ==========================================
 echo.
 
@@ -21,7 +21,15 @@ if not exist ".env" (
 if not exist "config\report_config.json" (
     echo ❌ 설정 파일이 없습니다!
     echo 먼저 update_month.ps1을 실행하세요.
-    echo 예: powershell -File update_month.ps1 -Year 2025 -Month 4
+    echo 예: powershell -File update_month.ps1 -Year 2025 -Month 5
+    pause
+    exit /b 1
+)
+
+:: 시스템 그룹 설정 파일 확인
+if not exist "config\system_groups.json" (
+    echo ❌ 시스템 그룹 설정 파일이 없습니다!
+    echo config\system_groups.json 파일을 생성하세요.
     pause
     exit /b 1
 )
@@ -29,6 +37,25 @@ if not exist "config\report_config.json" (
 :: 필요한 폴더들 생성
 if not exist "images" mkdir images
 if not exist "output" mkdir output
+if not exist "templates" (
+    mkdir templates
+    mkdir templates\assets
+)
+
+:: 템플릿 파일 존재 확인
+set "missing_templates="
+if not exist "templates\base.html" set "missing_templates=!missing_templates! base.html"
+if not exist "templates\server_section.html" set "missing_templates=!missing_templates! server_section.html"
+if not exist "templates\chart_category.html" set "missing_templates=!missing_templates! chart_category.html"
+if not exist "templates\chart_card.html" set "missing_templates=!missing_templates! chart_card.html"
+if not exist "templates\assets\style.css" set "missing_templates=!missing_templates! style.css"
+
+if not "!missing_templates!"=="" (
+    echo ❌ 템플릿 파일이 없습니다: !missing_templates!
+    echo templates 폴더에 필요한 파일들을 생성하세요.
+    pause
+    exit /b 1
+)
 
 :: 1단계: 이미지 다운로드
 echo [1/2] 그라파나 이미지 다운로드 중...
@@ -42,23 +69,27 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 2단계: PDF 생성
+:: 2단계: 템플릿 기반 리포트 생성
 echo.
-echo [2/2] PDF 리포트 생성 중...
+echo [2/2] 템플릿 기반 그룹별 리포트 생성 중...
 echo.
 python "02_generate_report.py"
 
 if %ERRORLEVEL% neq 0 (
     echo.
-    echo ❌ PDF 생성 실패!
+    echo ❌ 리포트 생성 실패!
     pause
     exit /b 1
 )
 
 echo.
 echo ==========================================
-echo ✅ 리포트 생성 완료!
+echo ✅ 그룹별 리포트 생성 완료!
 echo ==========================================
+echo   - 실제 그라파나 이미지 사용
+echo   - 템플릿 기반 HTML 생성
+echo   - 그룹별 동적 헤더 적용
+echo   - 이모티콘 제거된 전문적 스타일
 echo.
 
 :: 결과 폴더 열기

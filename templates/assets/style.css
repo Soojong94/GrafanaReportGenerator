@@ -34,7 +34,7 @@ body {
     padding: 2rem;
 }
 
-/* 헤더 스타일 - 애니메이션 제거 */
+/* 헤더 스타일 */
 .report-header {
     background: linear-gradient(135deg, var(--primary-color) 0%, #1e3d72 100%);
     color: var(--white);
@@ -83,6 +83,174 @@ body {
 .meta-value {
     font-weight: 600;
     font-size: 1rem;
+}
+
+/* 서버 섹션 스타일 */
+.server-section {
+    margin-bottom: 4rem;
+}
+
+.server-separator {
+    height: 3px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    margin: 4rem 0;
+    border-radius: 2px;
+    position: relative;
+}
+
+.server-separator::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 19px;
+    background: var(--white);
+    border-radius: 10px;
+}
+
+.server-separator::after {
+    content: '●';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+    background: var(--white);
+    padding: 0 0.5rem;
+    color: var(--primary-color);
+}
+
+.server-title {
+    background: linear-gradient(135deg, var(--accent-color) 0%, #0d8aa3 100%);
+    color: var(--white);
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-medium);
+}
+
+.server-title h2 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.server-description {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+/* 요약 섹션 스타일 */
+.summary-section {
+    background: var(--white);
+    border-radius: 12px;
+    margin-bottom: 3rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-medium);
+    border: 1px solid var(--border-color);
+}
+
+.summary-header {
+    background: linear-gradient(135deg, var(--secondary-color) 0%, #1e7e34 100%);
+    color: var(--white);
+    padding: 1.5rem 2rem;
+    text-align: center;
+}
+
+.summary-header h3 {
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.summary-header p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+.server-info-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    padding: 2rem;
+}
+
+.server-info-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.server-info-table th,
+.server-info-table td {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+.server-info-table th {
+    background: var(--light-bg);
+    font-weight: 600;
+    color: var(--text-primary);
+    width: 100px;
+}
+
+.alerts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.alerts-summary h4 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.alert-counts {
+    display: flex;
+    gap: 1rem;
+}
+
+.alert-item {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--light-bg);
+    flex: 1;
+}
+
+.alert-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--secondary-color);
+    margin-bottom: 0.5rem;
+}
+
+.alert-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.top5-alerts {
+    padding: 1rem;
+    background: var(--light-bg);
+    border-radius: 8px;
+}
+
+.top5-alerts h5 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.top5-alerts p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
 }
 
 /* 카테고리 섹션 */
@@ -181,44 +349,7 @@ body {
     background: var(--white);
 }
 
-/* 요약 통계 */
-.summary-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 3rem;
-}
-
-.stat-card {
-    background: var(--white);
-    padding: 1.5rem;
-    border-radius: 12px;
-    text-align: center;
-    box-shadow: var(--shadow-light);
-    border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-medium);
-}
-
-.stat-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-    display: block;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-/* 새로운 푸터 스타일 */
+/* 푸터 스타일 */
 .report-footer {
     margin-top: 4rem;
     padding: 2rem;
@@ -259,7 +390,8 @@ body {
     flex: 1;
 }
 
-.report-version, .security-level {
+.report-version, 
+.security-level {
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-bottom: 0.25rem;
@@ -309,6 +441,23 @@ body {
     
     .report-info {
         text-align: left;
+    }
+    
+    .server-info-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .alert-counts {
+        flex-direction: column;
+    }
+    
+    .server-title {
+        padding: 1.5rem 1rem;
+    }
+    
+    .server-title h2 {
+        font-size: 1.4rem;
     }
 }
 

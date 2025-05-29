@@ -1,0 +1,65 @@
+<div class="server-section">
+    <div class="server-title">
+        <h2>{{SERVER_NAME}}</h2>
+        <p class="server-description">{{SERVER_DESC}}</p>
+    </div>
+    
+    <div class="summary-section">
+        <div class="summary-header">
+            <h3>서버 현황</h3>
+            <p>서버 상태 및 핵심 지표 요약</p>
+        </div>
+        
+        <div class="server-info-grid">
+            <div class="server-info-table">
+                <table>
+                    <tr>
+                        <th>그룹명</th>
+                        <td>{{SERVER_GROUP_NAME}}</td>
+                        <th>OS</th>
+                        <td>{{SERVER_OS}}</td>
+                    </tr>
+                    <tr>
+                        <th>장비명</th>
+                        <td>{{SERVER_HOSTNAME}}</td>
+                        <th>DISK</th>
+                        <td>{{SERVER_DISK}}</td>
+                    </tr>
+                    <tr>
+                        <th>CPU/MEM</th>
+                        <td>{{SERVER_CPU_MEM}}</td>
+                        <th>가용률</th>
+                        <td>{{SERVER_AVAILABILITY}}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="alerts-section">
+                <div class="alerts-summary">
+                    <h4>전체 이상현황</h4>
+                    <div class="alert-counts">
+                        <div class="alert-item">
+                            <div class="alert-number">{{TOTAL_ALERTS}}</div>
+                            <div class="alert-label">전체</div>
+                        </div>
+                        <div class="alert-item">
+                            <div class="alert-number">{{CRITICAL_ALERTS}}</div>
+                            <div class="alert-label">긴급</div>
+                        </div>
+                        <div class="alert-item">
+                            <div class="alert-number">{{WARNING_ALERTS}}</div>
+                            <div class="alert-label">경고</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="top5-alerts">
+                    <h5>주요 알림 Top5</h5>
+                    <p>{{TOP5_NOTE}}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{CATEGORIES}}
+</div>
