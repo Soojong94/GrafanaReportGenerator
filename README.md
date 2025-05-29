@@ -77,8 +77,8 @@ GrafanaReportGenerator/
   },
   "grafana_servers": [
     {
-      "name": "Production-Server",
-      "url": "175.45.222.66:3000"
+      "name": "yourServer",
+      "url": "yourGrafanaIp:port"
     }
   ],
   "servers": { /* 서버 상세 정보 */ },
@@ -227,7 +227,6 @@ python enhanced_config_validator.py
 1. **월말에 실행**: 해당 월의 전체 데이터를 위해 월말에 실행 권장
 2. **정기 백업**: `config/unified_config.json` 파일 정기 백업
 3. **템플릿 커스터마이징**: `templates/` 폴더의 HTML/CSS 파일 수정으로 디자인 변경 가능
-4. **대용량 처리**: 차트가 많은 경우 `charts_per_page` 설정으로 페이지당 차트 수 조절
 
 ## 📞 지원 및 문의
 
