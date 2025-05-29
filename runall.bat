@@ -5,7 +5,8 @@ cd /d "%~dp0"
 
 echo.
 echo ==========================================
-echo   그라파나 서버 모니터링 리포트 생성 v2.1
+echo   그라파나 서버 모니터링 리포트 생성 v2.0
+echo   (통합 설정 기반)
 echo ==========================================
 echo.
 
@@ -17,38 +18,11 @@ if not exist ".env" (
     exit /b 1
 )
 
-:: 0단계: 고급 설정 파일 검증 (새로 추가)
-echo [0/3] 🔍 설정 파일 고급 검증 중...
-echo.
-python enhanced_config_validator.py
-
-if %ERRORLEVEL% neq 0 (
-    echo.
-    echo ❌ 설정 파일에 오류가 있습니다!
-    echo 💡 위의 상세한 해결책을 참고하여 문제를 수정하세요.
-    echo    문제 해결 후 다시 runall.bat을 실행하세요.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo.
-echo ✅ 설정 검증 완료! 리포트 생성을 시작합니다.
-echo.
-
-:: 기본 설정 파일 확인 (기존 코드 그대로)
-if not exist "config\report_config.json" (
-    echo ❌ 기본 설정 파일이 없습니다!
+:: 통합 설정 파일 확인 (기존 report_config.json 대신)
+if not exist "config\unified_config.json" (
+    echo ❌ 통합 설정 파일이 없습니다!
     echo 먼저 update_month.ps1을 실행하세요.
     echo 예: powershell -File update_month.ps1 -Year 2025 -Month 5
-    pause
-    exit /b 1
-)
-
-:: 시스템 그룹 설정 파일 확인
-if not exist "config\system_groups.json" (
-    echo ❌ 시스템 그룹 설정 파일이 없습니다!
-    echo config\system_groups.json 파일을 생성하세요.
     pause
     exit /b 1
 )
@@ -77,7 +51,7 @@ if not "!missing_templates!"=="" (
 )
 
 :: 1단계: 이미지 다운로드
-echo [1/3] 그라파나 이미지 다운로드 중...
+echo [1/2] 그라파나 이미지 다운로드 중...
 echo.
 powershell -ExecutionPolicy Bypass -File "01_download_images.ps1"
 
@@ -88,11 +62,11 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 2단계: 템플릿 기반 리포트 생성
+:: 2단계: 통합 설정 기반 리포트 생성
 echo.
-echo [2/3] 템플릿 기반 그룹별 리포트 생성 중...
+echo [2/2] 통합 설정 기반 리포트 생성 중...
 echo.
-python "02_generate_report.py"
+python "02_generate_report_unified.py"
 
 if %ERRORLEVEL% neq 0 (
     echo.
@@ -103,12 +77,12 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo ==========================================
-echo ✅ 그룹별 리포트 생성 완료!
+echo ✅ 통합 설정 기반 리포트 생성 완료!
 echo ==========================================
-echo   - ✅ 설정 파일 사전 검증 완료
-echo   - ✅ 실제 그라파나 이미지 사용
-echo   - ✅ 템플릿 기반 HTML 생성
-echo   - ✅ 그룹별 동적 헤더 적용
+echo   - 단일 통합 설정 파일 사용
+echo   - 실제 그라파나 이미지 사용
+echo   - 템플릿 기반 HTML 생성
+echo   - 그룹별 동적 헤더 적용
 echo.
 
 :: 결과 폴더 열기

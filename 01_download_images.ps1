@@ -1,11 +1,11 @@
-# 01_download_images.ps1
+# 01_download_images.ps1 (통합 설정 기반)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-Write-Host "=== Grafana Image Downloader Start ==="
+Write-Host "=== Grafana Image Downloader Start (통합 설정 기반) ==="
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$configFile = Join-Path $projectRoot "config\report_config.json"
+$configFile = Join-Path $projectRoot "config\unified_config.json"
 $imagesDir = Join-Path $projectRoot "images"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $downloadDir = Join-Path $imagesDir $timestamp
@@ -29,19 +29,19 @@ if (Test-Path $envFile) {
     exit 1
 }
 
-# Load config file
+# Load unified config file
 if (-not (Test-Path $configFile)) {
-    Write-Host "ERROR: Config file not found: $configFile"
-    Write-Host "Please run update_month.ps1 first"
+    Write-Host "ERROR: 통합 설정 파일을 찾을 수 없습니다: $configFile"
+    Write-Host "config/unified_config.json 파일을 생성하거나 update_month.ps1을 실행하세요"
     exit 1
 }
 
 try {
     $config = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
     $servers = $config.grafana_servers
-    Write-Host "Config loaded: $($servers.Count) servers"
+    Write-Host "통합 설정 로드: $($servers.Count) servers"
 } catch {
-    Write-Host "ERROR: Failed to read config file: $($_.Exception.Message)"
+    Write-Host "ERROR: 통합 설정 파일 읽기 실패: $($_.Exception.Message)"
     exit 1
 }
 
@@ -111,7 +111,7 @@ function Download-GrafanaPanel {
     $timeFrom = "now-30d"
     $timeTo = "now"
     
-    # Use date range from config if available
+    # Use date range from unified config if available
     if ($config.report_settings -and $config.report_settings.grafana_time_from) {
         try {
             $fromDate = [DateTime]::Parse($config.report_settings.grafana_time_from)
@@ -216,31 +216,38 @@ foreach ($server in $servers) {
     Write-Host "Server $($server.name) completed"
 }
 
-# Save results - 간단한 방법으로 변경
+# Save results - 통합 설정 파일 업데이트
 try {
-    # 기존 설정 읽어서 새로운 해시테이블 생성
+    # 기존 통합 설정 읽어서 업데이트
     $originalConfig = Get-Content -Path $configFile -Encoding UTF8 | ConvertFrom-Json
     
-    # 새로운 설정 해시테이블 생성
-    $newConfigHash = @{
-        "report_month" = $originalConfig.report_month
-        "period" = $originalConfig.period
-        "grafana_servers" = $originalConfig.grafana_servers
-        "report_settings" = $originalConfig.report_settings
-        "last_download" = @{
-            "timestamp" = $timestamp
-            "download_path" = $downloadDir
-            "total_images" = $totalImages
-            "success_images" = $successImages
-            "download_time" = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-        }
+    # last_download 정보 추가/업데이트
+    $lastDownloadInfo = @{
+        "timestamp" = $timestamp
+        "download_path" = $downloadDir
+        "total_images" = $totalImages
+        "success_images" = $successImages
+        "download_time" = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
     
-    # JSON으로 변환하여 저장
-    $newConfigHash | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
-    Write-Host "Config updated with download info"
+    # PowerShell에서 JSON 객체에 속성 추가/업데이트
+    if ($originalConfig.last_download) {
+        $originalConfig.last_download = $lastDownloadInfo
+    } else {
+        $originalConfig | Add-Member -Type NoteProperty -Name "last_download" -Value $lastDownloadInfo
+    }
+    
+    # 메타데이터 업데이트
+    if ($originalConfig._metadata) {
+        $originalConfig._metadata.last_updated = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    }
+    
+    # 통합 설정 파일 저장
+    $jsonContent = $originalConfig | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($configFile, $jsonContent, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "통합 설정 파일 업데이트 완료"
 } catch {
-    Write-Host "Warning: Failed to update config file: $($_.Exception.Message)"
+    Write-Host "Warning: 통합 설정 파일 업데이트 실패: $($_.Exception.Message)"
 }
 
 Write-Host ""
@@ -251,3 +258,4 @@ Write-Host "Failed: $($totalImages - $successImages)"
 Write-Host "Location: $downloadDir"
 Write-Host ""
 Write-Host "Image download completed successfully!"
+Write-Host "통합 설정 기반으로 다운로드가 완료되었습니다."

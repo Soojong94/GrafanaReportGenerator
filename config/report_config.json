@@ -1,12 +1,5 @@
-﻿{
+{
     "report_month":  "2025. 05",
-    "last_download":  {
-                          "total_images":  12,
-                          "timestamp":  "20250529_105350",
-                          "download_time":  "2025-05-29 10:54:20",
-                          "download_path":  "D:\\GrafanaReportGenerator\\images\\20250529_105350",
-                          "success_images":  12
-                      },
     "report_settings":  {
                             "grafana_time_from":  "2025-05-01",
                             "charts_per_page":  4,
